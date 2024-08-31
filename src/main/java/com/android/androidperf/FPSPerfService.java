@@ -5,7 +5,15 @@ import javafx.scene.chart.XYChart;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -16,7 +24,8 @@ public class FPSPerfService extends BasePerfService {
     boolean targetShouldChange = true;
 
     Future<?> updateLayerTask = null;
-
+//    LinkedHashMap<Long, Double> fpsList = new LinkedHashMap<>();
+    ArrayList<Double> fpsList = new ArrayList<>();
     void clearLatencyData() {
         var layers = new ArrayList<>(device.getLayers());
         layers.forEach(layer -> device.execCmd(String.format("dumpsys SurfaceFlinger --latency-clear '%s'", layer.layerName)));
@@ -198,6 +207,7 @@ public class FPSPerfService extends BasePerfService {
         if (fps < 1.)
             targetShouldChange = true;
         double finalFps = fps;
+        fpsList.add(finalFps);
         LOGGER.debug(String.format("%d / %f = %f", results.size(), totalTime / 1000, fps));
         LOGGER.debug("-------------------");
         Platform.runLater(() -> device.getController().addDataToChart("FPS", new XYChart.Data<>(timer, finalFps)));
@@ -208,6 +218,21 @@ public class FPSPerfService extends BasePerfService {
     void end() {
         if (updateLayerTask != null)
             updateLayerTask.cancel(true);
+        String fileName = device.getTargetPackage()+"_perf.txt";
+        try {
+            String currentDirectory = new File("").getAbsolutePath();
+            File file = new File(currentDirectory, fileName);
+            if (!file.exists()) {
+                file.createNewFile();
+            }
+            BufferedWriter out = new BufferedWriter(new FileWriter(file.getAbsoluteFile()));
+            out.write("FPS: " + fpsList.toString());
+            out.newLine();
+            out.flush();
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+
         super.end();
     }
 
